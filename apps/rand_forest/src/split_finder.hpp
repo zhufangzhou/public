@@ -33,6 +33,9 @@ public:
   // gain_ratio.
   float FindSplitValue(float* gain_ratio = 0);
 
+  // Clear the entries_
+  void Reset(int32_t num_labels);
+
 private:  // private functions
   friend class SplitFinderTest;
 
