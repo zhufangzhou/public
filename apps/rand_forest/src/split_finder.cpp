@@ -14,6 +14,12 @@ namespace tree {
 SplitFinder::SplitFinder(int32_t num_labels) :
   num_labels_(num_labels), pre_split_entropy_(0.) { }
 
+void SplitFinder::Reset(int32_t num_labels) {
+	num_labels_ = num_labels;
+	pre_split_entropy_ = 0.0;
+	entries_.clear();
+}
+
 void SplitFinder::AddInstance(float feature_val, int32_t label,
     float weight) {
   FeatureEntry new_entry;
@@ -64,14 +70,27 @@ float SplitFinder::FindSplitValue(float* gain_ratio) {
 
   std::random_device rd;
   std::mt19937 mt(rd());
-  std::uniform_real_distribution<float> dist(min_value, max_value);
 
   float best_gain_ratio = std::numeric_limits<float>::min();
   float best_split_val = min_value;
-  for (int i = 0; i < feature_value_dist.size(); ++i) {
+  std::vector<float> left_dist(num_labels_);
+  std::vector<float> right_dist(num_labels_);
+  float left_dist_weight = 0.;
+  float right_dist_weight = 0.;
+  int idx_start = 0;
+  // all to right first
+  for (auto iter = entries_.begin(); iter != entries_.end(); iter++) {
+	right_dist[iter->label] += iter->weight;
+	right_dist_weight += iter->weight;
+  }
+
+  for (int i = 1; i < feature_value_dist.size(); ++i) {
+	  std::uniform_real_distribution<float> dist(feature_value_dist[i-1], feature_value_dist[i]);
       // Randomly generate a split threshold
       float rand_split = dist(mt);
-      float gain_ratio = ComputeGainRatio(rand_split);
+      float gain_ratio = ComputeGainRatio(left_dist, right_dist, 
+			  left_dist_weight, right_dist_weight, idx_start, 
+			  rand_split);
 
       if (gain_ratio > best_gain_ratio) {
         best_gain_ratio = gain_ratio;
@@ -93,11 +112,15 @@ void SplitFinder::SortEntries() {
         (i.feature_val == j.feature_val && i.label < j.label)); });
 }
 
-float SplitFinder::ComputeGainRatio(float split_val) {
-  std::vector<float> left_dist(num_labels_);    // left distribution.
-  std::vector<float> right_dist(num_labels_);
-  float left_dist_weight = 0.;
-  float right_dist_weight = 0.;
+float SplitFinder::ComputeGainRatio(std::vector<float>& left_dist, std::vector<float>& right_dist,
+		float& left_dist_weight, float& right_dist_weight, int32_t& idx_start,
+		float split_val) {
+  //std::vector<float> left_dist(num_labels_);    // left distribution.
+  //std::vector<float> right_dist(num_labels_);
+  //float left_dist_weight = 0.;
+  //float right_dist_weight = 0.;
+  std::vector<float> left_dist_copy;
+  std::vector<float> right_dist_copy;
   for (auto iter = entries_.begin(); iter != entries_.end(); ++iter) {
     if (iter->feature_val <= split_val) {
       left_dist[iter->label] += iter->weight;
@@ -108,13 +131,16 @@ float SplitFinder::ComputeGainRatio(float split_val) {
     }
   }
 
+  left_dist_copy = left_dist;
+  right_dist_copy = right_dist;
+
   // Normalize
-  Normalize(&left_dist);
-  Normalize(&right_dist);
+  Normalize(&left_dist_copy);
+  Normalize(&right_dist_copy);
 
   // Compute entropy
-  float left_entropy = ComputeEntropy(left_dist);
-  float right_entropy = ComputeEntropy(right_dist);
+  float left_entropy = ComputeEntropy(left_dist_copy);
+  float right_entropy = ComputeEntropy(right_dist_copy);
 
   // Compute conditional entropy
   std::vector<float> split_dist;

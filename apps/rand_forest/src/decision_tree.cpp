@@ -56,7 +56,8 @@ void DecisionTree::Init(const DecisionTreeConfig& config) {
   for (int i = 0; i < feature_dim_; ++i) {
     feature_ids[i] = i;
   }
-  root_.reset(RecursiveBuild(0, data_idx, feature_ids));
+  //root_.reset(RecursiveBuild(0, data_idx, feature_ids));
+  root_.reset(RecursiveBuild(0, data_idx, 0, num_data_-1, feature_ids));
 }
 
 int32_t DecisionTree::Predict(
@@ -90,50 +91,70 @@ std::string DecisionTree::GetSerializedTree(){
 
 // ============== Private Methods =============
 
-TreeNode* DecisionTree::RecursiveBuild(int32_t depth,
-    const std::vector<int32_t>& available_data_idx,
-    const std::vector<int32_t>& available_feature_ids, TreeNode* curr_node) {
-  std::vector<int32_t> sub_data_idx = available_data_idx;
+//TreeNode* DecisionTree::RecursiveBuild(int32_t depth,
+    //const std::vector<int32_t>& available_data_idx,
+    //const std::vector<int32_t>& available_feature_ids, TreeNode* curr_node) {
+TreeNode* DecisionTree::RecursiveBuild(int32_t depth, 
+	const std::vector<int32_t>& data_idx, int32_t idx_head, int32_t, idx_tail, 
+	const std::vector<int32_t>& feature_ids, TreeNode* curr_node) {
+  //std::vector<int32_t> sub_data_idx = available_data_idx;
 
   if (curr_node == 0) {
     // Creating root.
     curr_node = new TreeNode();
 
     // Subsample data if we have more than num_data_subsample_ and num_data_subsample_ needs to be positive integer.
-    if (num_data_subsample_ > 0 && available_data_idx.size() > num_data_subsample_) {
-      std::vector<int32_t> available_data_idx_copy = available_data_idx;
-      std::shuffle(available_data_idx_copy.begin(),
-          available_data_idx_copy.end(), *rng_engine_);
-      sub_data_idx = std::vector<int32_t>(available_data_idx_copy.begin(),
-          available_data_idx_copy.begin() + num_data_subsample_);
-    }
+    //if (num_data_subsample_ > 0 && available_data_idx.size() > num_data_subsample_) {
+      //std::vector<int32_t> available_data_idx_copy = available_data_idx;
+      //std::shuffle(available_data_idx_copy.begin(),
+          //available_data_idx_copy.end(), *rng_engine_);
+      //sub_data_idx = std::vector<int32_t>(available_data_idx_copy.begin(),
+          //available_data_idx_copy.begin() + num_data_subsample_);
+    //}
   }
 
   // Base case.
-  if (depth == max_depth_ - 1 || available_feature_ids.size() == 0 ||
-      AllSameLabels(available_data_idx)) {
-    curr_node->SetLeafVal(ComputeLeafVal(available_data_idx));
-    return curr_node;                                                                                                                                      
+  //if (depth == max_depth_ - 1 || available_feature_ids.size() == 0 ||
+      //AllSameLabels(available_data_idx)) {
+    //curr_node->SetLeafVal(ComputeLeafVal(available_data_idx));
+    //return curr_node;                                                                                                                                      
+  //}
+  if (depth == max_depth_ -1 || idx_head == idx_tail || 
+		  AllSameLabels(data_idx, idx_head, idx_tail)) {
+	curr_node->SetLeafVal(ComputeLeafVal(data_idx, idx_head, idx_tail));
+	return curr_node;
   }
 
   // Subsample features if we have more than num_features_subsample_ and num_features_subsample_ needs to be positive integer.
-  std::vector<int32_t> sub_feature_ids;    
-  std::vector<int32_t> available_feature_ids_copy = available_feature_ids;
-  if (num_features_subsample_ > 0 && available_feature_ids.size() > num_features_subsample_) {    
-    std::shuffle(available_feature_ids_copy.begin(),
-        available_feature_ids_copy.end(), *rng_engine_);
-    sub_feature_ids = std::vector<int32_t>(available_feature_ids_copy.begin(),
-        available_feature_ids_copy.begin() + num_features_subsample_);
-  }else{
-    sub_feature_ids = available_feature_ids;
+  //std::vector<int32_t> sub_feature_ids;    
+  //std::vector<int32_t> available_feature_ids_copy = available_feature_ids;
+  //if (num_features_subsample_ > 0 && available_feature_ids.size() > num_features_subsample_) {    
+    //std::shuffle(available_feature_ids_copy.begin(),
+        //available_feature_ids_copy.end(), *rng_engine_);
+    //sub_feature_ids = std::vector<int32_t>(available_feature_ids_copy.begin(),
+        //available_feature_ids_copy.begin() + num_features_subsample_);
+  //}else{
+    //sub_feature_ids = available_feature_ids;
+  //}
+
+  std::vector<int32_t> sub_feature_ids;
+  if (num_features_subsample_ > 0) {
+	  std::shuffle(feature_ids.begin(),
+			  feature_ids.end(). *rng_engine_);
+	  sub_feature_ids = std::vector<int32_t>(feature_ids.begin(),
+			  feature_ids.begin() + num_features_subsample_);
+  } else {
+	  sub_feature_ids = feature_ids;
   }
 
   // Find a split.
   int32_t split_feature_id = 0;
   float split_feature_val = 0;
   float gain_ratio_val = 0;
-  int32_t split_feature_idx = FindSplit(sub_data_idx,
-      sub_feature_ids, &split_feature_id, &split_feature_val, &gain_ratio_val);
+  //int32_t split_feature_idx = FindSplit(sub_data_idx,
+      //sub_feature_ids, &split_feature_id, &split_feature_val, &gain_ratio_val);
+  int32_t split_feature_idx = FindSplit(data_idx, idx_head, idx_tail,
+		  sub_feature_ids, &split_feature_id, &split_feature_val, &gain_ratio_val);
   curr_node->Split(split_feature_id, split_feature_val, gain_ratio_val);
 
   // Partition the data by split_feature_val.
@@ -165,19 +186,50 @@ TreeNode* DecisionTree::RecursiveBuild(int32_t depth,
   return curr_node;
 }
 
-int32_t DecisionTree::FindSplit(const std::vector<int32_t>& sub_data_idx,
+//int32_t DecisionTree::FindSplit(const std::vector<int32_t>& sub_data_idx,
+    //const std::vector<int32_t>& sub_feature_ids,
+    //int32_t* split_feature_id, float* split_feature_val, float* gain_ratio_val) const {
+  //int32_t split_feature_idx = 0;
+  //float best_gain_ratio = std::numeric_limits<float>::min();
+
+  //for (int i = 0; i < sub_feature_ids.size(); ++i) {
+    //// For each feature, add feature val and label of each sample
+    //SplitFinder split_finder(num_labels_);
+    //for (int j = 0; j < sub_data_idx.size(); ++j) {
+      //split_finder.AddInstance(
+          //(*(*features_)[sub_data_idx[j]])[sub_feature_ids[i]],
+          //(*labels_)[sub_data_idx[j]]);
+    //}
+    //// Compute gain ratio of the feature
+    //float gain_ratio;
+    //float split_val = split_finder.FindSplitValue(&gain_ratio);
+    //// Compare gain ratio of different features
+    //if (gain_ratio > best_gain_ratio) {
+      //best_gain_ratio = gain_ratio;
+      //*split_feature_val = split_val;
+      //split_feature_idx = i;
+    //}
+
+  //}
+  //*split_feature_id = sub_feature_ids[split_feature_idx];
+  //*gain_ratio_val = best_gain_ratio;
+  //return split_feature_idx;
+//}
+
+int32_t DecisionTree::FindSplit(const std::vector<int32_t>& data_idx, int idx_head, int idx_tail,
     const std::vector<int32_t>& sub_feature_ids,
     int32_t* split_feature_id, float* split_feature_val, float* gain_ratio_val) const {
   int32_t split_feature_idx = 0;
   float best_gain_ratio = std::numeric_limits<float>::min();
 
+  SplitFinder split_finder(num_labels_);
   for (int i = 0; i < sub_feature_ids.size(); ++i) {
+	split_finder.Reset(num_labels_);
     // For each feature, add feature val and label of each sample
-    SplitFinder split_finder(num_labels_);
-    for (int j = 0; j < sub_data_idx.size(); ++j) {
+    for (int j = idx_head; j <= idx_tail; ++j) {
       split_finder.AddInstance(
-          (*(*features_)[sub_data_idx[j]])[sub_feature_ids[i]],
-          (*labels_)[sub_data_idx[j]]);
+          (*(*features_)[data_idx[j]])[sub_feature_ids[i]],
+          (*labels_)[data_idx[j]]);
     }
     // Compute gain ratio of the feature
     float gain_ratio;
@@ -210,10 +262,26 @@ void DecisionTree::PartitionData(int32_t feature_id, float feature_val,
   }
 }
 
-int32_t DecisionTree::ComputeLeafVal(const std::vector<int32_t>& data_idx)
+//int32_t DecisionTree::ComputeLeafVal(const std::vector<int32_t>& data_idx)
+  //const {
+    //std::vector<int32_t> count_each_label(num_labels_);
+    //for (int i = 0; i < data_idx.size(); ++i) {
+      //int32_t label = (*labels_)[data_idx[i]];
+      //count_each_label[label]++;
+    //}
+    //int32_t max_label = 0;
+    //for (int i = 1; i < num_labels_; ++i) {
+      //if (count_each_label[i] > count_each_label[max_label]) {
+        //max_label = i;
+      //}
+    //}
+    //return max_label;
+  //}
+
+int32_t DecisionTree::ComputeLeafVal(const std::vector<int32_t>& data_idx, const int idx_head, const int idx_tail)
   const {
     std::vector<int32_t> count_each_label(num_labels_);
-    for (int i = 0; i < data_idx.size(); ++i) {
+    for (int i = idx_head; i <= idx_tail; ++i) {
       int32_t label = (*labels_)[data_idx[i]];
       count_each_label[label]++;
     }
@@ -226,12 +294,25 @@ int32_t DecisionTree::ComputeLeafVal(const std::vector<int32_t>& data_idx)
     return max_label;
   }
 
-bool DecisionTree::AllSameLabels(const std::vector<int32_t>& data_idx) const {
-  if (data_idx.size() == 0) {
+//bool DecisionTree::AllSameLabels(const std::vector<int32_t>& data_idx) const {
+  //if (data_idx.size() == 0) {
+    //return true;  // vacuously true.
+  //}
+  //int32_t label = (*labels_)[data_idx[0]];
+  //for (int i = 1; i < data_idx.size(); ++i) {
+    //if (label != (*labels_)[data_idx[i]]) {
+      //return false;
+    //}
+  //}
+  //return true;
+//}
+
+bool DecisionTree::AllSameLabels(const std::vector<int32_t>& data_idx, const int idx_head, const int idx_tail) const {
+  if (idx_head == idx_tail) {
     return true;  // vacuously true.
   }
-  int32_t label = (*labels_)[data_idx[0]];
-  for (int i = 1; i < data_idx.size(); ++i) {
+  int32_t label = (*labels_)[data_idx[idx_head]];
+  for (int i = idx_head+1; i <= idx_tail; ++i) {
     if (label != (*labels_)[data_idx[i]]) {
       return false;
     }
