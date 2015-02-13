@@ -113,7 +113,7 @@ void SplitFinder::SortEntries() {
 }
 
 float SplitFinder::ComputeGainRatio(std::vector<float>& left_dist, std::vector<float>& right_dist,
-		float& left_dist_weight, float& right_dist_weight, int32_t& idx_start,
+		float& left_dist_weight, float& right_dist_weight, int32_t& idx,
 		float split_val) {
   //std::vector<float> left_dist(num_labels_);    // left distribution.
   //std::vector<float> right_dist(num_labels_);
@@ -121,15 +121,29 @@ float SplitFinder::ComputeGainRatio(std::vector<float>& left_dist, std::vector<f
   //float right_dist_weight = 0.;
   std::vector<float> left_dist_copy;
   std::vector<float> right_dist_copy;
-  for (auto iter = entries_.begin(); iter != entries_.end(); ++iter) {
-    if (iter->feature_val <= split_val) {
-      left_dist[iter->label] += iter->weight;
-      left_dist_weight += iter->weight;
-    } else {
-      right_dist[iter->label] += iter->weight;
-      right_dist_weight += iter->weight;
-    }
+  FeatureEntry fe;
+
+  for (; idx < entries_.size(); idx++) {
+	fe = entries_[idx];
+	if (fe.feature_val <= split_val) {
+		left_dist[fe.label] += fe.weight;
+		right_dist[fe.label] -= fe.weight;
+		left_dist_weight += fe.weight;
+		right_dist_weight -= fe.weight;
+	} else {
+		break;
+	}
   }
+
+  //for (auto iter = entries_.begin(); iter != entries_.end(); ++iter) {
+    //if (iter->feature_val <= split_val) {
+      //left_dist[iter->label] += iter->weight;
+      //left_dist_weight += iter->weight;
+    //} else {
+      //right_dist[iter->label] += iter->weight;
+      //right_dist_weight += iter->weight;
+    //}
+  //}
 
   left_dist_copy = left_dist;
   right_dist_copy = right_dist;
