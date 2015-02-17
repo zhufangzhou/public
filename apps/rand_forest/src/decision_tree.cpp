@@ -95,8 +95,8 @@ std::string DecisionTree::GetSerializedTree(){
     //const std::vector<int32_t>& available_data_idx,
     //const std::vector<int32_t>& available_feature_ids, TreeNode* curr_node) {
 TreeNode* DecisionTree::RecursiveBuild(int32_t depth, 
-	const std::vector<int32_t>& data_idx, int32_t idx_head, int32_t, idx_tail, 
-	const std::vector<int32_t>& feature_ids, TreeNode* curr_node) {
+	std::vector<int32_t>& data_idx, int32_t idx_head, int32_t idx_tail, 
+	std::vector<int32_t>& feature_ids, TreeNode* curr_node) {
   //std::vector<int32_t> sub_data_idx = available_data_idx;
 
   if (curr_node == 0) {
@@ -136,11 +136,12 @@ TreeNode* DecisionTree::RecursiveBuild(int32_t depth,
   //}else{
     //sub_feature_ids = available_feature_ids;
   //}
+  //LOG(INFO) << "depth " << depth;
 
   std::vector<int32_t> sub_feature_ids;
   if (num_features_subsample_ > 0) {
 	  std::shuffle(feature_ids.begin(),
-			  feature_ids.end(). *rng_engine_);
+			  feature_ids.end(), *rng_engine_);
 	  sub_feature_ids = std::vector<int32_t>(feature_ids.begin(),
 			  feature_ids.begin() + num_features_subsample_);
   } else {
@@ -153,35 +154,46 @@ TreeNode* DecisionTree::RecursiveBuild(int32_t depth,
   float gain_ratio_val = 0;
   //int32_t split_feature_idx = FindSplit(sub_data_idx,
       //sub_feature_ids, &split_feature_id, &split_feature_val, &gain_ratio_val);
-  int32_t split_feature_idx = FindSplit(data_idx, idx_head, idx_tail,
+  FindSplit(data_idx, idx_head, idx_tail,
 		  sub_feature_ids, &split_feature_id, &split_feature_val, &gain_ratio_val);
   curr_node->Split(split_feature_id, split_feature_val, gain_ratio_val);
 
   // Partition the data by split_feature_val.
   std::vector<int32_t> left_partition;
   std::vector<int32_t> right_partition;
-  PartitionData(split_feature_id, split_feature_val, sub_data_idx,
-      &left_partition, &right_partition);
+  //PartitionData(split_feature_id, split_feature_val, sub_data_idx,
+      //&left_partition, &right_partition);
+  int32_t right_idx_head = PartitionData(split_feature_id, split_feature_val, data_idx,
+		  idx_head, idx_tail);
+  //if (right_idx_head == idx_head || right_idx_head > idx_tail) return;
 
   // Remove split_feature_id from available_feature_ids.
-  available_feature_ids_copy[split_feature_idx] =
-    available_feature_ids_copy[available_feature_ids.size() - 1];
-  available_feature_ids_copy.pop_back();
+  //available_feature_ids_copy[split_feature_idx] =
+    //available_feature_ids_copy[available_feature_ids.size() - 1];
+  //available_feature_ids_copy.pop_back();
 
   // Build left subtree (ignore the returned TreeNode*).
   TreeNode* left_child = curr_node->GetLeftChild();
   TreeNode* right_child = curr_node->GetRightChild();
-  if (left_partition.size() == 0) {
-    left_child->SetLeafVal(ComputeLeafVal(sub_data_idx));
+  //if (left_partition.size() == 0) {
+  if (right_idx_head == idx_head) {
+    //left_child->SetLeafVal(ComputeLeafVal(sub_data_idx));
+    left_child->SetLeafVal(ComputeLeafVal(data_idx, idx_head, right_idx_head-1));
   } else {
-    RecursiveBuild(depth + 1, left_partition, available_feature_ids_copy,
-      left_child);
+    //RecursiveBuild(depth + 1, left_partition, available_feature_ids_copy,
+      //left_child);
+	RecursiveBuild(depth + 1, data_idx, idx_head, right_idx_head-1,
+			feature_ids, left_child);
   }
-  if (right_partition.size() == 0) {
-    right_child->SetLeafVal(ComputeLeafVal(sub_data_idx));
+  //if (right_partition.size() == 0) {
+  if (right_idx_head > idx_tail) {
+    //right_child->SetLeafVal(ComputeLeafVal(sub_data_idx));
+	right_child->SetLeafVal(ComputeLeafVal(data_idx, right_idx_head, idx_tail));
   } else {
-    RecursiveBuild(depth + 1, right_partition, available_feature_ids_copy,
-      right_child);
+    //RecursiveBuild(depth + 1, right_partition, available_feature_ids_copy,
+      //right_child);
+	RecursiveBuild(depth + 1, data_idx, right_idx_head, idx_tail,
+			feature_ids, right_child);
   }
   return curr_node;
 }
@@ -216,7 +228,7 @@ TreeNode* DecisionTree::RecursiveBuild(int32_t depth,
   //return split_feature_idx;
 //}
 
-int32_t DecisionTree::FindSplit(const std::vector<int32_t>& data_idx, int idx_head, int idx_tail,
+void DecisionTree::FindSplit(const std::vector<int32_t>& data_idx, int idx_head, int idx_tail,
     const std::vector<int32_t>& sub_feature_ids,
     int32_t* split_feature_id, float* split_feature_val, float* gain_ratio_val) const {
   int32_t split_feature_idx = 0;
@@ -244,22 +256,39 @@ int32_t DecisionTree::FindSplit(const std::vector<int32_t>& data_idx, int idx_he
   }
   *split_feature_id = sub_feature_ids[split_feature_idx];
   *gain_ratio_val = best_gain_ratio;
-  return split_feature_idx;
+  //return split_feature_idx;
 }
 
-void DecisionTree::PartitionData(int32_t feature_id, float feature_val,
-    const std::vector<int32_t>& data_idx,
-    std::vector<int32_t>* left_partition,
-    std::vector<int32_t>* right_partition) const {
-  left_partition->clear();
-  right_partition->clear();
-  for (int i = 0; i < data_idx.size(); ++i) {
-    if ((*(*features_)[data_idx[i]])[feature_id] <= feature_val) {
-      left_partition->push_back(data_idx[i]);
-    } else {
-      right_partition->push_back(data_idx[i]);
-    }
-  }
+//void DecisionTree::PartitionData(int32_t feature_id, float feature_val,
+    //const std::vector<int32_t>& data_idx,
+    //std::vector<int32_t>* left_partition,
+    //std::vector<int32_t>* right_partition) const {
+  //left_partition->clear();
+  //right_partition->clear();
+  //for (int i = 0; i < data_idx.size(); ++i) {
+    //if ((*(*features_)[data_idx[i]])[feature_id] <= feature_val) {
+      //left_partition->push_back(data_idx[i]);
+    //} else {
+      //right_partition->push_back(data_idx[i]);
+    //}
+  //}
+//}
+
+int32_t DecisionTree::PartitionData(const int32_t feature_id, const float feature_val,
+		std::vector<int32_t>& data_idx, const int32_t idx_head, const int32_t idx_tail) const {
+	int32_t change_idx = idx_head, idx_temp;
+	for (int i = idx_head+1; i <= idx_tail; i++) {
+		if((*(*features_)[data_idx[i]])[feature_id] <= feature_val) {
+			idx_temp = data_idx[change_idx];
+			data_idx[change_idx] = data_idx[i];
+			data_idx[i] = idx_temp;
+			change_idx++;
+		}
+	}
+	if ((*(*features_)[data_idx[change_idx]])[feature_id] <= feature_val)
+		return change_idx+1;
+	else 
+		return change_idx;
 }
 
 //int32_t DecisionTree::ComputeLeafVal(const std::vector<int32_t>& data_idx)

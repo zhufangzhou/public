@@ -61,30 +61,39 @@ public:
 
 private:    // private methods.
   // Internal build method.
-  TreeNode* RecursiveBuild(int32_t depth,
-      const std::vector<int32_t>& available_data_idx,
-      const std::vector<int32_t>& available_feature_ids,
-      TreeNode* curr_node = 0);
+  //TreeNode* RecursiveBuild(int32_t depth,
+      //const std::vector<int32_t>& available_data_idx,
+      //const std::vector<int32_t>& available_feature_ids,
+      //TreeNode* curr_node = 0);
+	TreeNode* RecursiveBuild(int32_t depth, 
+			std::vector<int32_t>& data_idx, int32_t idx_head, int32_t idx_tail,
+			std::vector<int32_t>& feature_ids, TreeNode* curr_node = 0);
 
   // Find the feature (among sub_feature_ids) to split and split value using
   // subset of data (sub_data_idx). Return idx such that sub_feature_ids[idx]
   // = *split_feature_id.
-  int32_t FindSplit(const std::vector<int32_t>& sub_data_idx,
-      const std::vector<int32_t>& sub_feature_ids,
-      int32_t* split_feature_id, float* split_feature_val, float* gain_ratio) const;
+  //int32_t FindSplit(const std::vector<int32_t>& sub_data_idx,
+      //const std::vector<int32_t>& sub_feature_ids,
+      //int32_t* split_feature_id, float* split_feature_val, float* gain_ratio) const;
+	void FindSplit(const std::vector<int32_t>& data_idx, int idx_head, int idx_tail,
+			const std::vector<int32_t>& sub_feature_ids,
+			int32_t* split_feature_id, float* split_feature_val, float* gain_ratio_val) const;
 
   // Partition 'data_idx' into left_partition (whose 'feature_id' feature
   // <= feature_val), and right_partition.
-  void PartitionData(int32_t feature_id, float feature_val,
-      const std::vector<int32_t>& data_idx,
-      std::vector<int32_t>* left_partition,
-      std::vector<int32_t>* right_partition) const;
+  //void PartitionData(int32_t feature_id, float feature_val,
+      //const std::vector<int32_t>& data_idx,
+      //std::vector<int32_t>* left_partition,
+      //std::vector<int32_t>* right_partition) const;
+  int32_t PartitionData(const int32_t feature_id, const float feature_val, std::vector<int32_t>& data_idx, const int32_t idx_head, const int32_t idx_tail) const;
 
   // Find majority vote to get leaf value.
-  int32_t ComputeLeafVal(const std::vector<int32_t>& data_idx) const;
+  //int32_t ComputeLeafVal(const std::vector<int32_t>& data_idx) const;
+  int32_t ComputeLeafVal(const std::vector<int32_t>& data_idx, const int idx_head, const int idx_tail) const;
 
   // True if all labels in data_idx are the same.
-  bool AllSameLabels(const std::vector<int32_t>& data_idx) const;
+  //bool AllSameLabels(const std::vector<int32_t>& data_idx) const;
+  bool AllSameLabels(const std::vector<int32_t>& data_idx, const int idx_head, const int idx_tail) const;
 
   // Serialize the tree with pre-order traversal
   void Serialize(TreeNode *p, std::string &out);

@@ -5,6 +5,8 @@
 # Iris Dataset
 #train_filename="iris.train.bin"
 #test_filename="iris.test.bin"
+#train_filename="iris.train"
+#test_filename="iris.test"
 #train_filename="webspam_wc_normalized_unigram.svm.tr"
 #test_filename="webspam_wc_normalized_unigram.svm.te"
 train_filename="webspam_wc_normalized_unigram.bin.tr"
@@ -25,9 +27,9 @@ output_filename="forest.model"
 
 # Rand Forest parameters
 num_trees=10
-max_depth=2
+max_depth=0
 num_data_subsample=0
-num_features_subsample=10
+num_features_subsample=15
 compute_importance=true
 
 # Host file
@@ -59,7 +61,7 @@ num_unique_hosts=`cat $host_file | awk '{ print $2 }' | uniq | wc -l`
 
 output_dir=$app_dir/output
 output_dir="${output_dir}/rf.${train_filename}"
-#output_dir="${output_dir}.RT`date +%Y%m%d%H%M%S`i"
+output_dir="${output_dir}.date`date +%Y%m%d%H%M%S`i"
 output_dir="${output_dir}.S${staleness}.E${num_epochs}"
 output_dir="${output_dir}.M${num_unique_hosts}"
 output_dir="${output_dir}.T${num_app_threads}"

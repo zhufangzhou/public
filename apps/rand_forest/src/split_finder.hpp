@@ -43,7 +43,8 @@ private:  // private functions
   void SortEntries();
 
   // Return the gain ratio for this split_val.
-  float ComputeGainRatio(float split_val);
+  //float ComputeGainRatio(float split_val);
+  float ComputeGainRatio(std::vector<float>& left_dist, std::vector<float>& right_dist, float& left_dist_weight, float& right_dist_weight, int32_t& idx, float split_val);
 
 private:
   std::vector<FeatureEntry> entries_;
