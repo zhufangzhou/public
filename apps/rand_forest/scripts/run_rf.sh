@@ -61,11 +61,11 @@ num_unique_hosts=`cat $host_file | awk '{ print $2 }' | uniq | wc -l`
 
 output_dir=$app_dir/output
 output_dir="${output_dir}/rf.${train_filename}"
-output_dir="${output_dir}.date`date +%Y%m%d%H%M%S`i"
+output_dir="${output_dir}.date`date +%Y%m%d%H%M%S`"
 output_dir="${output_dir}.S${staleness}.E${num_epochs}"
 output_dir="${output_dir}.M${num_unique_hosts}"
 output_dir="${output_dir}.T${num_app_threads}"
-output_dir="${output_dir}.TREE${num_trees}.test"
+output_dir="${output_dir}.TREE${num_trees}.fast"
 output_file_prefix=$output_dir/rf_out  # prefix for program outputs
 
 output_file_prefix=${output_dir}/rf_out  # Prefix for program output files.
