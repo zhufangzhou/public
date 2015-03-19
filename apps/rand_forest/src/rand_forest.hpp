@@ -44,6 +44,9 @@ public:
   void Predict(const petuum::ml::AbstractFeature<float>& x,
       std::vector<int32_t>* votes = 0) const;
 
+  void GoDownTrees(const petuum::ml::AbstractFeature<float>& x,
+	  std::vector<int32_t>* res_throughout_trees = 0) const;
+
   void ComputeFeatureImportance(std::vector<float>& importance) const;
 
 private:

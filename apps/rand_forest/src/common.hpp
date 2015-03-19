@@ -22,11 +22,13 @@ DECLARE_bool(compute_importance);
 
 // Rand Forest Parameters
 DECLARE_int32(test_vote_table_id);
+DECLARE_int32(train_vote_table_id);
 DECLARE_int32(gain_ratio_table_id);
 DECLARE_int32(num_trees);
 DECLARE_int32(max_depth);
 DECLARE_int32(num_data_subsample);
 DECLARE_int32(num_features_subsample);
+DECLARE_int32(num_layers);
 
 // Save and Load
 DECLARE_bool(save_pred);

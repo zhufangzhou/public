@@ -55,6 +55,19 @@ void RandForest::Predict(const petuum::ml::AbstractFeature<float>& x,
     //return max_label;
 }
 
+void RandForest::GoDownTrees(const petuum::ml::AbstractFeature<float>& x,
+		std::vector<int32_t>* res_throughout_trees) const {
+	std::vector<int32_t> res_copy(num_trees_);
+	for (int i = 0; i < num_trees_; ++i) {
+		int32_t pred_label = trees_[i]->Predict(x);
+		res_copy[i] = pred_label;
+	}
+
+	if (res_throughout_trees != 0) {
+		*res_throughout_trees = res_copy;
+	}
+}
+
 void RandForest::SaveTrees(std::string output_file) {
   std::ofstream fout;
   fout.open(output_file, std::ios::app);

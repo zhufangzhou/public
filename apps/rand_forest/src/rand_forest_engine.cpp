@@ -20,8 +20,8 @@
 namespace tree {
 
 RandForestEngine::RandForestEngine() : num_train_data_(0),
-  num_test_data_(0), feature_dim_(0),
-  num_labels_(0), num_train_eval_(0), num_test_eval_(0),
+  num_test_data_(0), feature_dim_(0), 
+  num_labels_(0), num_train_eval_(0), num_test_eval_(0), c_layer_(0),
   read_format_("libsvm"), feature_one_based_(0),
   label_one_based_(0), thread_counter_(0) {
 
@@ -39,7 +39,8 @@ RandForestEngine::RandForestEngine() : num_train_data_(0),
   }
   // Params for saving trained trees
   save_trees_ = FLAGS_save_trees;
-  output_file_ = FLAGS_output_file + ".part" + std::to_string(FLAGS_client_id);
+  output_file_ = FLAGS_output_file + ".part" + std::to_string(FLAGS_client_id) + "." + std::to_string(c_layer_);
+
   if (save_trees_) {
     CHECK(!output_file_.empty()) << "Need to specify an output "
       "file path.";
@@ -154,11 +155,21 @@ void RandForestEngine::Start() {
       FLAGS_num_app_threads);
   num_left_trees -= num_left_clients * FLAGS_num_app_threads;
 
+  int tree_idx_start;
+  // Add remaining trees to thread and calculate tree_idx_start
   if (FLAGS_client_id < num_left_clients) {
       num_trees_per_thread ++;
+	  tree_idx_start = FLAGS_num_clients * FLAGS_num_app_threads * num_trees_per_thread
+		  + thread_id * num_trees_per_thread;
   } else if ((FLAGS_client_id == num_left_clients) &&
     (thread_id < num_left_trees)) {
       num_trees_per_thread ++;
+	  tree_idx_start = FLAGS_num_clients * FLAGS_num_app_threads * num_trees_per_thread
+		  + thread_id * num_trees_per_thread;
+  } else {
+	  tree_idx_start = num_left_clients * FLAGS_num_app_threads * (num_trees_per_thread + 1) /* FLAGS_client_id < num_left_clients */
+		  + num_left_trees * (num_trees_per_thread + 1) /* FLAGS_client_id == num_left_clients && (threads_id < num_left_trees) */
+		  + (FLAGS_client_id*FLAGS_num_app_threads+thread_id - num_left_clients*FLAGS_num_app_threads+num_left_trees) * num_trees_per_thread;
   }
 
   RandForestConfig rf_config;
@@ -174,6 +185,10 @@ void RandForestEngine::Start() {
       petuum::PSTableGroup::GetTableOrDie<int>(FLAGS_test_vote_table_id);
 	gain_ratio_table_ = 
 	  petuum::PSTableGroup::GetTableOrDie<float>(FLAGS_gain_ratio_table_id);
+	train_intermediate_table_ =
+	  petuum::PSTableGroup::GetTableOrDie<int>(FLAGS_train_intermediate_table_id);
+	test_intermediate_table_ =
+	  petuum::PSTableGroup::GetTableOrDie<int>(FLAGS_train_intermediate_table_id);
   }
   // Barrier to ensure test_vote_table_ is initialized.
   process_barrier_->wait();
@@ -219,8 +234,8 @@ void RandForestEngine::Start() {
       //<< num_train_data_ << " training data)";
   //}
 
-  // Feature importance
-  if (FLAGS_compute_importance) {
+  // Feature importance (compute only in one layer mode)
+  if (FLAGS_compute_importance && FLAGS_num_layers == 1) {
 	AccumulateGainRatio(rand_forest);
 	petuum::PSTableGroup::GlobalBarrier();
 	if (FLAGS_client_id == 0 && thread_id == 0) {
@@ -237,26 +252,40 @@ void RandForestEngine::Start() {
 	}
   }
 
-  // Test error.
-  if (perform_test_) {
-    //float test_error = VoteOnTestData(rand_forest);
-    VoteOnTestData(rand_forest);
-    petuum::PSTableGroup::GlobalBarrier();
+  // Go to next layer
+  if (HasNextLayer()) {
+	GoDownTrainData(rand_forest, tree_idx_start);
+	petuum::PSTableGroup::GlobalBarrier();
+
+	GoDownTestData(rand_forest, tree_idx_start);
+	petuum::PSTableGroup::GlobalBarrier();
+	// Set the output of current layer as input of next layer
 	if (FLAGS_client_id == 0 && thread_id == 0) {
-		GeneratePerformanceReport();
+		InitNextLayer();	
 	}
-    // Evaluating test error on one thread of each machine.
-    //if (thread_id == 0) {
-      //LOG(INFO) << "client " << FLAGS_client_id << " test error: "
-        //<< test_error << " (evaluated on "
-        //<< num_test_data_ << " test data)";
-    //}
-    // Evaluating overall test error
-    //if (FLAGS_client_id == 0 && thread_id == 0) {
-      //float test_error = ComputeTestError();
-      //LOG(INFO) << "Test error: " << test_error
-        //<< " computed on " << test_features_.size() << " test instances.";
-    //}
+  } else {
+
+	  // Test error.
+	  if (perform_test_) {
+		//float test_error = VoteOnTestData(rand_forest);
+		VoteOnTestData(rand_forest);
+		petuum::PSTableGroup::GlobalBarrier();
+		if (FLAGS_client_id == 0 && thread_id == 0) {
+			GeneratePerformanceReport();
+		}
+		// Evaluating test error on one thread of each machine.
+		//if (thread_id == 0) {
+		  //LOG(INFO) << "client " << FLAGS_client_id << " test error: "
+			//<< test_error << " (evaluated on "
+			//<< num_test_data_ << " test data)";
+		//}
+		// Evaluating overall test error
+		//if (FLAGS_client_id == 0 && thread_id == 0) {
+		  //float test_error = ComputeTestError();
+		  //LOG(INFO) << "Test error: " << test_error
+			//<< " computed on " << test_features_.size() << " test instances.";
+		//}
+	  }
   }
 
   petuum::PSTableGroup::DeregisterThread();
@@ -293,6 +322,28 @@ void RandForestEngine::VoteOnTestData(const RandForest& rand_forest) {
     test_vote_table_.BatchInc(i, vote_update_batch);
   }
   //return error / test_features_.size();
+}
+
+void RandForestEngine::GoDownTrainData(const RandForest& rand_forest, int tree_idx_start) {
+	for (int i = 0; i < train_features_.size(); ++i) {
+		std::vector<int> res_throughout_trees;
+		const petuum::ml::AbstractFeature<float>& x = *(train_features_[i]);
+		rand_forest.GoDownTrees(x, &res_throughout_trees);
+		for (int j = 0; j < FLAGS_num_trees; ++j) {
+			train_intermediate_table_.Inc(c_layer_*train_features_.size() + i, tree_idx_start+j, res_throughout_trees[j]);
+		}
+	}
+}
+
+void RandForestEngine::GodownTestData(const RandForest& rand_forest, int tree_idx_start) {
+	for (int i = 0; i < test_features_.size(); ++i) {
+		std::vector<int> res_throughout_trees;
+		const petuum::ml::AbstractFeature<float>& x = *(test_features_[i]);
+		rand_forest.GoDownTrees(x, &res_throughout_trees);
+		for (int j = 0; j < FLAGS_num_trees; ++j) {
+			test_intermediate_table_.Inc(c_layer_*test_features_.size() + i, tree_idx_start+j, res_throughout_trees[j]);
+		}
+	}
 }
 
 void RandForestEngine::AccumulateGainRatio(const RandForest& rand_forest) {
@@ -409,6 +460,51 @@ void RandForestEngine::ComputeFeatureImportance(std::vector<float>& importance) 
 	const auto& gain_ratio_row = row_acc.Get<petuum::DenseRow<float> >();
 	gain_ratio_row.CopyToVector(&importance);
 	Normalize(&importance);
+}
+
+bool RandForestEngine::HasNextLayer() {
+	return c_layer_ < FLAGS_num_layers-1;
+}
+
+void RandForestEngine::InitNextLayer() {
+	// update train data in next layer
+	for (int i = 0; i < train_features_.size(); i++) {
+		petuum::RowAccessor row_acc;
+		train_intermediate_table_.Get(c_layer_*train_features_.size() + i, &row_acc);
+		const auto& train_intermediate_row = row_acc.Get<petuum::DenseRow<int> >();
+		std::vector<int> res_per_tree_int;
+		std::vector<float> res_per_tree_float;
+		train_intermediate_row.CopyToVector(&res_per_tree_int);
+		// copy feature to train_features
+		if (train_features_[i] != nullptr) { // delete old features
+			delete train_features_[i];
+		}
+		Int2Float(res_per_tree_int, res_per_tree_float);
+		// copy new features
+		train_features_[i] = new petuum::ml::DenseFeature<float>(res_per_tree_float);
+	}
+
+	if (perform_test_) {	
+		// update test data in next layer
+		for (int i = 0; i < test_features_.size(); i++) {
+			petuum::RowAccessor row_acc;
+			test_intermediate_table_.Get(c_layer_*test_features_.size() + i, &row_acc);
+			const auto& test_intermediate_row = row_acc.Get<petuum::DenseRow<int> >();
+			std::vector<int> res_per_tree_int;
+			std::vector<float> res_per_tree_float;
+			test_intermediate_row.CopyToVector(&res_per_tree_int);
+			// copy feature to test_features
+			if (test_features_[i] != nullptr) {
+				delete test_features_[i];
+			}
+			Int2Float(res_per_tree_int, res_per_tree_float);
+			// copy new features
+			test_features_[i] = new petuum::ml::DenseFeature<float>(res_per_tree_float);
+		}
+	}
+
+	c_layer_++;
+	feature_dim_ = FLAGS_num_trees;
 }
 
 }  // namespace tree

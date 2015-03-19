@@ -29,9 +29,15 @@ public:
     return num_test_data_;
   }
 
+  int GetNumTrainData() const {
+	  return num_train_data_;
+  }
+
   int GetNumFeatureDim() const {
 	  return feature_dim_;
   }
+
+  void InitNextLayer();
 
   // Can be called concurrently.
   void Start();
@@ -50,6 +56,11 @@ private:  // private methods
   //float VoteOnTestData(const RandForest& rand_forest);
   void VoteOnTestData(const RandForest& rand_forest);
 
+  // Register label votes on train data on train_vote_table_.
+  void GoDownTrainData(const RandForest& rand_forest, int tree_idx_start);
+
+  void GoDownTestData(const RandForest& rand_forest, int tree_idx_start);
+
   // Only head thread should call this to collect the votes and compute test
   // error.
   float ComputeTestError();
@@ -62,6 +73,8 @@ private:  // private methods
 
   void GeneratePerformanceReport();
 
+  bool HasNextLayer();
+
 private:
   // ============== Data Variables ==================
   int32_t num_train_data_;
@@ -70,6 +83,7 @@ private:
   int32_t num_labels_;  // # of classes
   int32_t num_train_eval_;  // # of train data in each eval
   int32_t num_test_eval_;  // # of test data in each eval
+  int32_t c_layer_; 			// current layer
   bool perform_test_;
   std::string read_format_; // for both train and test.
   bool feature_one_based_;  // feature starts from 1 (train and test).
@@ -103,6 +117,8 @@ private:
   // ============ PS Tables ============
   petuum::Table<int> test_vote_table_;
   petuum::Table<float> gain_ratio_table_;
+  petuum::Table<int> train_intermediate_table_;
+  petuum::Table<int> test_intermediate_table_;
 };
 
 }  // namespace tree
