@@ -30,6 +30,10 @@ class RandForest {
 public:
   RandForest(const RandForestConfig& config);
 
+  int GetNumTrees() const {
+	  return num_trees_;
+  }
+
   // Train the trees
   void Train();
 

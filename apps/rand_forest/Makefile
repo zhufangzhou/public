@@ -29,11 +29,11 @@ $(RF_BIN):
 
 $(RF_BIN)/rand_forest_main: $(RF_OBJ) $(PETUUM_PS_LIB) \
 	$(PETUUM_ML_LIB) $(RF_BIN)
-	$(PETUUM_CXX) $(PETUUM_CXXFLAGS) $(PETUUM_INCFLAGS) \
+	$(PETUUM_CXX) -g $(PETUUM_CXXFLAGS) $(PETUUM_INCFLAGS) \
 		$(RF_OBJ) $(PETUUM_ML_LIB) $(PETUUM_PS_LIB) $(PETUUM_LDFLAGS) -o $@
 
 $(RF_OBJ): %.o: %.cpp $(RF_HDR)
-	$(PETUUM_CXX) $(PETUUM_CXXFLAGS) -Wno-unused-result \
+	$(PETUUM_CXX) -g $(PETUUM_CXXFLAGS) -Wno-unused-result \
 		$(PETUUM_INCFLAGS) -c $< -o $@
 
 

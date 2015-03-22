@@ -61,12 +61,16 @@ float SplitFinder::FindSplitValue(float* gain_ratio) {
   std::vector<float> feature_value_dist;
   feature_value_dist.push_back(min_value);
   if (max_value > min_value) { 
-    for (int i = 1; i < entries_.size(); i++) {
+    for (int i = 0; i < entries_.size(); i++) {
       if (entries_[i].feature_val > feature_value_dist.back()) {
         feature_value_dist.push_back(entries_[i].feature_val);
       }
     }    
+  } else {
+	  *gain_ratio = std::numeric_limits<float>::min();
+	  return 0;
   }
+
 
   std::random_device rd;
   std::mt19937 mt(rd());
@@ -88,16 +92,16 @@ float SplitFinder::FindSplitValue(float* gain_ratio) {
 	  std::uniform_real_distribution<float> dist(feature_value_dist[i-1], feature_value_dist[i]);
       // Randomly generate a split threshold
       float rand_split = dist(mt);
-      float gain_ratio = ComputeGainRatio(left_dist, right_dist, 
+      float gain_ratio_inside = ComputeGainRatio(left_dist, right_dist, 
 			  left_dist_weight, right_dist_weight, idx_start, 
 			  rand_split);
 
-      if (gain_ratio > best_gain_ratio) {
-        best_gain_ratio = gain_ratio;
+      if (gain_ratio_inside > best_gain_ratio) {
+        best_gain_ratio = gain_ratio_inside;
         best_split_val = rand_split;
       }
     }
-  if (gain_ratio != 0) {
+  if (best_gain_ratio != 0) {
     *gain_ratio = best_gain_ratio;
   }
   return best_split_val;

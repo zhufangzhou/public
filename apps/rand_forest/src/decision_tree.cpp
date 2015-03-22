@@ -47,6 +47,7 @@ void DecisionTree::Init(const DecisionTreeConfig& config) {
   std::random_device rd;
   rng_engine_.reset(new std::mt19937(rd()));
 
+
   std::vector<int32_t> data_idx(num_data_);
   for (int i = 0; i < num_data_; ++i) {
     data_idx[i] = i;
@@ -98,6 +99,18 @@ TreeNode* DecisionTree::RecursiveBuild(int32_t depth,
 	std::vector<int32_t>& data_idx, int32_t idx_head, int32_t idx_tail, 
 	std::vector<int32_t>& feature_ids, TreeNode* curr_node) {
   //std::vector<int32_t> sub_data_idx = available_data_idx;
+  
+	//LOG(INFO) << "depth: " << depth << " idx_head: " << idx_head << " idx_tail: " << idx_tail;
+	//if (idx_head == 37 && idx_tail == 65) {
+		//for (int i = idx_head; i <= idx_tail; i++) {
+			//std::cout << (*labels_)[i] << " ";
+			//for (int j = 0; j < 5; j++) {
+				//std::cout << j << ":" << (*(*features_)[data_idx[i]])[j] << " ";
+			//}
+			//std::cout << std::endl;
+		//}
+		//exit(0);
+	//}
 
   if (curr_node == 0) {
     // Creating root.
@@ -156,7 +169,15 @@ TreeNode* DecisionTree::RecursiveBuild(int32_t depth,
       //sub_feature_ids, &split_feature_id, &split_feature_val, &gain_ratio_val);
   FindSplit(data_idx, idx_head, idx_tail,
 		  sub_feature_ids, &split_feature_id, &split_feature_val, &gain_ratio_val);
+  // if can't split
+  if (gain_ratio_val == std::numeric_limits<float>::min()) {
+	curr_node->SetLeafVal(ComputeLeafVal(data_idx, idx_head, idx_tail));
+	return curr_node;
+  }
+
+  //LOG(INFO) << "split_feature_id: " << split_feature_id << " split_feature_val: " << split_feature_val;
   curr_node->Split(split_feature_id, split_feature_val, gain_ratio_val);
+
 
   // Partition the data by split_feature_val.
   std::vector<int32_t> left_partition;
@@ -165,6 +186,7 @@ TreeNode* DecisionTree::RecursiveBuild(int32_t depth,
       //&left_partition, &right_partition);
   int32_t right_idx_head = PartitionData(split_feature_id, split_feature_val, data_idx,
 		  idx_head, idx_tail);
+  //LOG(INFO) << "right_idx_head: " << right_idx_head;
   //if (right_idx_head == idx_head || right_idx_head > idx_tail) return;
 
   // Remove split_feature_id from available_feature_ids.
@@ -175,6 +197,8 @@ TreeNode* DecisionTree::RecursiveBuild(int32_t depth,
   // Build left subtree (ignore the returned TreeNode*).
   TreeNode* left_child = curr_node->GetLeftChild();
   TreeNode* right_child = curr_node->GetRightChild();
+
+
   //if (left_partition.size() == 0) {
   if (right_idx_head == idx_head) {
     //left_child->SetLeafVal(ComputeLeafVal(sub_data_idx));
@@ -277,7 +301,8 @@ void DecisionTree::FindSplit(const std::vector<int32_t>& data_idx, int idx_head,
 int32_t DecisionTree::PartitionData(const int32_t feature_id, const float feature_val,
 		std::vector<int32_t>& data_idx, const int32_t idx_head, const int32_t idx_tail) const {
 	int32_t change_idx = idx_head, idx_temp;
-	for (int i = idx_head+1; i <= idx_tail; i++) {
+	//if ((*(*features_)[data_idx[idx_head]])[feature_id] > feature_val) LOG(INFO) << "!!!!!";
+	for (int i = idx_head; i <= idx_tail; i++) {
 		if((*(*features_)[data_idx[i]])[feature_id] <= feature_val) {
 			idx_temp = data_idx[change_idx];
 			data_idx[change_idx] = data_idx[i];
@@ -285,9 +310,9 @@ int32_t DecisionTree::PartitionData(const int32_t feature_id, const float featur
 			change_idx++;
 		}
 	}
-	if ((*(*features_)[data_idx[change_idx]])[feature_id] <= feature_val)
-		return change_idx+1;
-	else 
+	//if ((*(*features_)[data_idx[change_idx]])[feature_id] <= feature_val)
+		//return change_idx+1;
+	//else 
 		return change_idx;
 }
 

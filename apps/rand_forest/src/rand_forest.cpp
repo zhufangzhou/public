@@ -11,7 +11,13 @@ RandForest::RandForest(const RandForestConfig& config) :
   num_threads_(config.num_threads), num_trees_(config.num_trees),
   num_labels_(config.tree_config.num_labels),
   save_trees_(config.save_trees), tree_config_(config.tree_config) { 
-
+	//for (int i = 0; i < 120; i++) {
+		//std::cout << (*tree_config_.labels)[i] << " ";
+		//for (int j = 0; j < tree_config_.feature_dim; j++) {
+			//std::cout << j << ":" << (*((*tree_config_.features)[i]))[j] << " ";
+		//}
+		//std::cout << std::endl;
+	//}
   }
 
 void RandForest::Train() {

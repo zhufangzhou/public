@@ -131,6 +131,7 @@ int main(int argc, char *argv[]) {
   // Use false to disallow main thread to access table API.
   petuum::PSTableGroup::Init(table_group_config, false);
 
+
   // Create vote_table to collect tests.
   petuum::ClientTableConfig table_config;
   table_config.table_info.row_type = kDenseRowIntTypeID;
@@ -165,9 +166,9 @@ int main(int argc, char *argv[]) {
   train_intermediate_table_config.table_info.oplog_dense_serialized = 
 	  FLAGS_oplog_dense_serialized;
   // each train data is a row.
-  train_table_config.process_cache_capacity = num_train_data;
-  train_table_config.oplog_capacity = train_table_config.process_cache_capacity;
-  petuum::PSTableGroup::CreateTable(FLAGS_train_intermediate_table_id, train_table_config);
+  train_intermediate_table_config.process_cache_capacity = num_train_data;
+  train_intermediate_table_config.oplog_capacity = train_intermediate_table_config.process_cache_capacity;
+  petuum::PSTableGroup::CreateTable(FLAGS_train_intermediate_table_id, train_intermediate_table_config);
 
   // Create test_intermediate_table to collect test vote when building multi-layer forest.
   petuum::ClientTableConfig test_intermediate_table_config;
@@ -178,9 +179,9 @@ int main(int argc, char *argv[]) {
   test_intermediate_table_config.table_info.oplog_dense_serialized = 
 	  FLAGS_oplog_dense_serialized;
   // each test data is a row.
-  test_table_config.process_cache_capacity = num_test_data;
-  test_table_config.oplog_capacity = test_table_config.process_cache_capacity;
-  petuum::PSTableGroup::CreateTable(FLAGS_test_intermediate_table_id, test_table_config);
+  test_intermediate_table_config.process_cache_capacity = num_test_data;
+  test_intermediate_table_config.oplog_capacity = test_intermediate_table_config.process_cache_capacity;
+  petuum::PSTableGroup::CreateTable(FLAGS_test_intermediate_table_id, test_intermediate_table_config);
 
   // finish Create Tables
   petuum::PSTableGroup::CreateTableDone();
@@ -189,29 +190,31 @@ int main(int argc, char *argv[]) {
     << "on client " << FLAGS_client_id;
 
 	CHECK(FLAGS_num_layers > 0);
-	if (FLAGS_num_layers <= 1) {
-
+	//if (FLAGS_num_layers <= 1) {
 		std::vector<std::thread> threads(FLAGS_num_app_threads);
 		for (auto& thr : threads) {
 			thr = std::thread(&tree::RandForestEngine::Start,
-					std::ref(rand_forest_engine));
+					std::ref(rand_forest_engine), 0, 0);
 		}
 		for (auto& thr : threads) {
 			thr.join();
 		}
 
-	} else {
-		for (int l = 0; l < FLAGS_num_layers; l++) {
-				std::vector<std::thread> threads(FLAGS_num_app_threads);
-				for (auto& thr : threads) {
-						thr = std::thread(&tree::RandForestEngine::Start,
-										std::ref(rand_forest_engine));
-				}
-				for (auto& thr : threads) {
-						thr.join();
-				}
-		}
-	}
+	//} else {
+		//for (int l = 0; l < FLAGS_num_layers; l++) {
+				//std::vector<std::thread> threads(FLAGS_num_app_threads);
+				//for (auto& thr : threads) {
+						//thr = std::thread(&tree::RandForestEngine::Start,
+										//std::ref(rand_forest_engine));
+				//}
+				//for (auto& thr : threads) {
+						//thr.join();
+				//}
+
+				//LOG(INFO) << "Layer " << l+1 << " ~~~~~~~~~~~~~~~~~";
+				//break;
+		//}
+	//}
 
   petuum::PSTableGroup::ShutDown();
   LOG(INFO) << "Rand Forest finished and shut down!";

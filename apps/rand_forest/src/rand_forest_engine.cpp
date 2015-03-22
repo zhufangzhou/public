@@ -131,11 +131,17 @@ void RandForestEngine::ReadData(std::string type) {
   }
 }
 
-void RandForestEngine::Start() {
-  petuum::PSTableGroup::RegisterThread();
+void RandForestEngine::Start(int c_layer, int thread_id) {
+  // Register Thread in the first layer
+  //int thread_id = thread_counter_++;
+  if (c_layer == 0) {
+	  petuum::PSTableGroup::RegisterThread();
+	  thread_id = thread_counter_++;
+  } else if (c_layer >= FLAGS_num_layers) {
+	  return ;
+  }
 
   // Initialize local thread data structures.
-  int thread_id = thread_counter_++;
 
   DecisionTreeConfig dt_config;
   dt_config.max_depth = FLAGS_max_depth;
@@ -172,6 +178,7 @@ void RandForestEngine::Start() {
 		  + (FLAGS_client_id*FLAGS_num_app_threads+thread_id - num_left_clients*FLAGS_num_app_threads+num_left_trees) * num_trees_per_thread;
   }
 
+
   RandForestConfig rf_config;
   rf_config.client_id = FLAGS_client_id;
   rf_config.thread_id = thread_id;
@@ -188,7 +195,7 @@ void RandForestEngine::Start() {
 	train_intermediate_table_ =
 	  petuum::PSTableGroup::GetTableOrDie<int>(FLAGS_train_intermediate_table_id);
 	test_intermediate_table_ =
-	  petuum::PSTableGroup::GetTableOrDie<int>(FLAGS_train_intermediate_table_id);
+	  petuum::PSTableGroup::GetTableOrDie<int>(FLAGS_test_intermediate_table_id);
   }
   // Barrier to ensure test_vote_table_ is initialized.
   process_barrier_->wait();
@@ -253,16 +260,19 @@ void RandForestEngine::Start() {
   }
 
   // Go to next layer
-  if (HasNextLayer()) {
-	GoDownTrainData(rand_forest, tree_idx_start);
+  if (HasNextLayer(c_layer)) {
+	GoDownTrainData(rand_forest, tree_idx_start, c_layer);
 	petuum::PSTableGroup::GlobalBarrier();
 
-	GoDownTestData(rand_forest, tree_idx_start);
+	GoDownTestData(rand_forest, tree_idx_start, c_layer);
 	petuum::PSTableGroup::GlobalBarrier();
 	// Set the output of current layer as input of next layer
 	if (FLAGS_client_id == 0 && thread_id == 0) {
-		InitNextLayer();	
+		InitNextLayer(c_layer);	
 	}
+	// Wait all threads
+	petuum::PSTableGroup::GlobalBarrier();
+	Start(c_layer+1, thread_id);
   } else {
 
 	  // Test error.
@@ -288,7 +298,9 @@ void RandForestEngine::Start() {
 	  }
   }
 
-  petuum::PSTableGroup::DeregisterThread();
+  if (c_layer == 0) {
+	  petuum::PSTableGroup::DeregisterThread();
+  }
 }
 
 // =========== Private Functions =============
@@ -324,24 +336,25 @@ void RandForestEngine::VoteOnTestData(const RandForest& rand_forest) {
   //return error / test_features_.size();
 }
 
-void RandForestEngine::GoDownTrainData(const RandForest& rand_forest, int tree_idx_start) {
+void RandForestEngine::GoDownTrainData(const RandForest& rand_forest, int tree_idx_start, int c_layer) {
 	for (int i = 0; i < train_features_.size(); ++i) {
 		std::vector<int> res_throughout_trees;
 		const petuum::ml::AbstractFeature<float>& x = *(train_features_[i]);
 		rand_forest.GoDownTrees(x, &res_throughout_trees);
-		for (int j = 0; j < FLAGS_num_trees; ++j) {
-			train_intermediate_table_.Inc(c_layer_*train_features_.size() + i, tree_idx_start+j, res_throughout_trees[j]);
+		for (int j = 0; j < rand_forest.GetNumTrees(); ++j) {
+			train_intermediate_table_.Inc(c_layer*train_features_.size() + i, tree_idx_start+j, res_throughout_trees[j]);
 		}
 	}
 }
 
-void RandForestEngine::GodownTestData(const RandForest& rand_forest, int tree_idx_start) {
+void RandForestEngine::GoDownTestData(const RandForest& rand_forest, int tree_idx_start, int c_layer) {
 	for (int i = 0; i < test_features_.size(); ++i) {
 		std::vector<int> res_throughout_trees;
 		const petuum::ml::AbstractFeature<float>& x = *(test_features_[i]);
 		rand_forest.GoDownTrees(x, &res_throughout_trees);
-		for (int j = 0; j < FLAGS_num_trees; ++j) {
-			test_intermediate_table_.Inc(c_layer_*test_features_.size() + i, tree_idx_start+j, res_throughout_trees[j]);
+		for (int j = 0; j < rand_forest.GetNumTrees(); ++j) {
+			//LOG(INFO) << "row:" << c_layer*test_features_.size()+i << " | column: " << tree_idx_start+j << " | update: " << res_throughout_trees[j];
+			test_intermediate_table_.Inc(c_layer*test_features_.size() + i, tree_idx_start+j, res_throughout_trees[j]);
 		}
 	}
 }
@@ -462,15 +475,15 @@ void RandForestEngine::ComputeFeatureImportance(std::vector<float>& importance) 
 	Normalize(&importance);
 }
 
-bool RandForestEngine::HasNextLayer() {
-	return c_layer_ < FLAGS_num_layers-1;
+bool RandForestEngine::HasNextLayer(int c_layer) {
+	return c_layer < FLAGS_num_layers-1;
 }
 
-void RandForestEngine::InitNextLayer() {
+void RandForestEngine::InitNextLayer(int c_layer) {
 	// update train data in next layer
 	for (int i = 0; i < train_features_.size(); i++) {
 		petuum::RowAccessor row_acc;
-		train_intermediate_table_.Get(c_layer_*train_features_.size() + i, &row_acc);
+		train_intermediate_table_.Get(c_layer*train_features_.size() + i, &row_acc);
 		const auto& train_intermediate_row = row_acc.Get<petuum::DenseRow<int> >();
 		std::vector<int> res_per_tree_int;
 		std::vector<float> res_per_tree_float;
@@ -488,7 +501,7 @@ void RandForestEngine::InitNextLayer() {
 		// update test data in next layer
 		for (int i = 0; i < test_features_.size(); i++) {
 			petuum::RowAccessor row_acc;
-			test_intermediate_table_.Get(c_layer_*test_features_.size() + i, &row_acc);
+			test_intermediate_table_.Get(c_layer*test_features_.size() + i, &row_acc);
 			const auto& test_intermediate_row = row_acc.Get<petuum::DenseRow<int> >();
 			std::vector<int> res_per_tree_int;
 			std::vector<float> res_per_tree_float;
@@ -503,7 +516,6 @@ void RandForestEngine::InitNextLayer() {
 		}
 	}
 
-	c_layer_++;
 	feature_dim_ = FLAGS_num_trees;
 }
 

@@ -37,10 +37,10 @@ public:
 	  return feature_dim_;
   }
 
-  void InitNextLayer();
+  void InitNextLayer(int c_layer);
 
   // Can be called concurrently.
-  void Start();
+  void Start(int c_layer = 0, int thread_id = 0);
 
 private:  // private methods
 
@@ -57,9 +57,9 @@ private:  // private methods
   void VoteOnTestData(const RandForest& rand_forest);
 
   // Register label votes on train data on train_vote_table_.
-  void GoDownTrainData(const RandForest& rand_forest, int tree_idx_start);
+  void GoDownTrainData(const RandForest& rand_forest, int tree_idx_start, int c_layer);
 
-  void GoDownTestData(const RandForest& rand_forest, int tree_idx_start);
+  void GoDownTestData(const RandForest& rand_forest, int tree_idx_start, int c_layer);
 
   // Only head thread should call this to collect the votes and compute test
   // error.
@@ -73,7 +73,7 @@ private:  // private methods
 
   void GeneratePerformanceReport();
 
-  bool HasNextLayer();
+  bool HasNextLayer(int c_layer);
 
 private:
   // ============== Data Variables ==================

@@ -5,12 +5,12 @@
 # Iris Dataset
 #train_filename="iris.train.bin"
 #test_filename="iris.test.bin"
-#train_filename="iris.train"
-#test_filename="iris.test"
+train_filename="iris.train"
+test_filename="iris.test"
 #train_filename="webspam_wc_normalized_unigram.svm.tr"
 #test_filename="webspam_wc_normalized_unigram.svm.te"
-train_filename="webspam_wc_normalized_unigram.bin.tr"
-test_filename="webspam_wc_normalized_unigram.bin.te"
+#train_filename="webspam_wc_normalized_unigram.bin.tr"
+#test_filename="webspam_wc_normalized_unigram.bin.te"
 train_file=$(readlink -f datasets/$train_filename)
 test_file=$(readlink -f datasets/$test_filename)
 
@@ -26,10 +26,11 @@ save_trees=false
 output_filename="forest.model"
 
 # Rand Forest parameters
-num_trees=10
+num_layers=1
+num_trees=100
 max_depth=0
 num_data_subsample=0
-num_features_subsample=15
+num_features_subsample=0
 compute_importance=true
 
 # Host file
@@ -39,7 +40,7 @@ host_filename="scripts/localserver"
 num_train_data=0  # 0 to use all training data.
 
 # System parameters:
-num_app_threads=10
+num_app_threads=1
 num_comm_channels_per_client=8
 
 # Figure out the paths.
@@ -108,6 +109,7 @@ for ip in $unique_host_list; do
       --num_data_subsample=$num_data_subsample \
       --num_features_subsample=$num_features_subsample \
       --num_trees=$num_trees \
+	  --num_layers=$num_layers \
 	  --compute_importance=$compute_importance \
       --save_pred=$save_pred \
 	  --output_proba=$output_proba \
@@ -117,6 +119,7 @@ for ip in $unique_host_list; do
 	  --save_report=$save_report \
 	  --report_file=$report_file "
 
+  echo $cmd
   ssh $ssh_options $ip $cmd &
   #echo $cmd
   #eval $cmd  # Use this to run locally (on one machine).
