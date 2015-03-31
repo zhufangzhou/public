@@ -23,6 +23,9 @@ void Int2Float(const std::vector<int>& v1, std::vector<float>& v2);
 void GetRow(const std::vector<std::vector<float> >& matrix, std::vector<float>& row, int rowId);
 void GetCol(const std::vector<std::vector<float> >& matrix, std::vector<float>& col, int colId);
 
+float Accuracy(const std::vector<std::vector<float> >& y_pred, const std::vector<int>& y_true, int n_classes, float threshold = 0.5);
+float Accuracy(const std::vector<int>* y_ored, const std::vector<int>& y_true, int n_classes);
+
 float Precision(const std::vector<std::vector<float> >& y_pred, const std::vector<int>& y_true, int n_classes, float threshold = 0.5);
 float Precision(const std::vector<int>& y_pred, const std::vector<int>& y_true, int n_classes);
 
@@ -36,6 +39,7 @@ float Roc_auc_score(const std::vector<std::vector<float> >& y_pred, const std::v
 float Pr_auc_score(const std::vector<std::vector<float> >& y_pred, const std::vector<int>& y_true, int n_classes);
 
 void PerformanceReport(const std::string& filename, const std::vector<std::vector<float> >& y_pred, const std::vector<int>& y_true, int n_classes, float threshold = 0.5);
+void PerformanceReport(const std::string& filename, const std::vector<std::vector<float> >& y_pred1, const std::vector<int>& y_true1, const std::vector<std::vector<float> >& y_pred2, const std::vector<int>& y_true2, int n_classes, float threshold = 0.5);
 	
 
 // ArgSort

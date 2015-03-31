@@ -68,6 +68,36 @@ namespace {
 		}
 	}
 
+	float accuracy_bin(const std::vector<int>& y_pred, const std::vector<int>& y_true) {
+		int size = y_pred.size(), T;
+		CHECK_EQ(size, y_true.size());
+
+		T = 0;
+		for (int i = 0; i < size; i++) {
+			if (y_pred[i] == y_true[i]) T++;
+		}
+		if (T == 0) 
+			return 0;
+		else 
+			return (float)T / size;
+	}
+	float accuracy_bin(const std::vector<float>& y_pred, const std::vector<int>& y_true, float threshold = 0.5) {
+		std::vector<int> y_pred_label;
+		gen_binary_label(y_pred, y_pred_label, threshold);
+
+		return accuracy_bin(y_pred_label, y_true);
+	}
+	float accuracy_mul(const std::vector<int>& y_pred, const std::vector<int>& y_true, int n_classes) {
+		return accuracy_bin(y_pred, y_true);
+	}
+	float accuracy_mul(const std::vector<std::vector<float> >& y_pred, const std::vector<int>& y_true, int n_classes) {
+		std::vector<int> y_pred_label;
+		gen_multi_label(y_pred, y_pred_label, n_classes);
+
+		return accuracy_mul(y_pred_label, y_true, n_classes);
+	}
+
+
 	float precision_bin(const std::vector<int>& y_pred, const std::vector<int>& y_true) {
 		int size = y_pred.size(), TP, FP, val;
 		CHECK_EQ(size, y_true.size());
@@ -334,6 +364,25 @@ namespace tree {
 		}
 	}
 
+	float Accuracy(const std::vector<std::vector<float> >& y_pred, const std::vector<int>& y_true, int n_classes, float threshold) {
+		CHECK_GE(n_classes, 2);
+		if (n_classes == 2) {
+			std::vector<float> y_pred_pos;
+			GetCol(y_pred, y_pred_pos, 1);
+			return accuracy_bin(y_pred_pos, y_true, threshold);
+		} else {
+			return accuracy_mul(y_pred, y_true, n_classes);
+		}
+	}
+	float Accuracy(const std::vector<int>& y_pred, const std::vector<int>& y_true, int n_classes) {
+		CHECK_GE(n_classes, 2);
+		if (n_classes == 2) {
+			return accuracy_bin(y_pred, y_true);
+		} else {
+			return accuracy_mul(y_pred, y_true, n_classes);
+		}
+	}
+
 	float Precision(const std::vector<std::vector<float> >& y_pred, const std::vector<int>& y_true, int n_classes, float threshold) {
 		CHECK_GE(n_classes, 2);
 		if (n_classes == 2) {
@@ -428,6 +477,41 @@ namespace tree {
 		out << "F1-score\t" << F1_score(y_pred, y_true, n_classes, threshold) << std::endl;
 		out << "ROC-AUC score\t" << Roc_auc_score(y_pred, y_true, n_classes) << std::endl;
 		out << "Precision-Recall AUC score\t" << Pr_auc_score(y_pred, y_true, n_classes) << std::endl;
+	
+		out.close();
+	}
+	void PerformanceReport(const std::string& filename, const std::vector<std::vector<float> >& y_pred1, const std::vector<int>& y_true1, const std::vector<std::vector<float> >& y_pred2, const std::vector<int>& y_true2, int n_classes, float threshold) {
+		std::ofstream out;
+		out.open(filename.c_str(), std::ios::out);
+		CHECK(out != nullptr) << "Cannot open report file.";
+
+		CHECK_EQ(y_pred1.size(), y_true1.size()) << "`y_pred1` size do not match with `y_true1`";
+		CHECK_EQ(y_pred2.size(), y_true2.size()) << "`y_pred2` size do not match with `y_true2`";
+
+		// set format
+		out << std::fixed << std::setprecision(3);
+
+		out << "Train Set Size\t" << y_pred1.size() << std::endl;
+		if (n_classes == 2) 
+			out << "Threshold\t" << threshold << std::endl;
+		out << "Accuracy\t" << Accuracy(y_pred1, y_true1, n_classes, threshold) << std::endl;
+		out << "Precision\t" << Precision(y_pred1, y_true1, n_classes, threshold) << std::endl;
+		out << "Recall\t" << Recall(y_pred1, y_true1, n_classes, threshold) << std::endl;
+		out << "F1-score\t" << F1_score(y_pred1, y_true1, n_classes, threshold) << std::endl;
+		out << "ROC-AUC score\t" << Roc_auc_score(y_pred1, y_true1, n_classes) << std::endl;
+		out << "Precision-Recall AUC score\t" << Pr_auc_score(y_pred1, y_true1, n_classes) << std::endl;
+
+		out << std::endl;
+
+		out << "Test Set Size\t" << y_pred2.size() << std::endl;
+		if (n_classes == 2) 
+			out << "Threshold\t" << threshold << std::endl;
+		out << "Accuracy\t" << Accuracy(y_pred2, y_true2, n_classes, threshold) << std::endl;
+		out << "Precision\t" << Precision(y_pred2, y_true2, n_classes, threshold) << std::endl;
+		out << "Recall\t" << Recall(y_pred2, y_true2, n_classes, threshold) << std::endl;
+		out << "F1-score\t" << F1_score(y_pred2, y_true2, n_classes, threshold) << std::endl;
+		out << "ROC-AUC score\t" << Roc_auc_score(y_pred2, y_true2, n_classes) << std::endl;
+		out << "Precision-Recall AUC score\t" << Pr_auc_score(y_pred2, y_true2, n_classes) << std::endl;
 	
 		out.close();
 	}

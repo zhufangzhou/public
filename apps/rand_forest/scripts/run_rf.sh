@@ -20,14 +20,14 @@ perform_test=true
 save_pred=true
 save_report=true
 report_filename="report.txt"
-output_proba=true
+output_proba=false
 pred_filename="prediction.result"
 save_trees=false
 output_filename="forest.model"
 
 # Rand Forest parameters
 num_layers=1
-num_trees=100
+num_trees=400
 max_depth=0
 num_data_subsample=0
 num_features_subsample=0
@@ -40,7 +40,7 @@ host_filename="scripts/localserver"
 num_train_data=0  # 0 to use all training data.
 
 # System parameters:
-num_app_threads=1
+num_app_threads=20
 num_comm_channels_per_client=8
 
 # Figure out the paths.
@@ -66,7 +66,7 @@ output_dir="${output_dir}.date`date +%Y%m%d%H%M%S`"
 output_dir="${output_dir}.S${staleness}.E${num_epochs}"
 output_dir="${output_dir}.M${num_unique_hosts}"
 output_dir="${output_dir}.T${num_app_threads}"
-output_dir="${output_dir}.TREE${num_trees}.fast"
+output_dir="${output_dir}.TREE${num_trees}.deep"
 output_file_prefix=$output_dir/rf_out  # prefix for program outputs
 
 output_file_prefix=${output_dir}/rf_out  # Prefix for program output files.

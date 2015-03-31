@@ -62,11 +62,12 @@ DEFINE_string(input_file, "", "Only one thread read from input file "
 
 
 // Misc
-DEFINE_int32(num_tables, 4, "num PS tables.");
+DEFINE_int32(num_tables, 5, "num PS tables.");
 DEFINE_int32(test_vote_table_id, 1, "Vote table for test data.");
-DEFINE_int32(gain_ratio_table_id, 2, "Gain ratio table.");
-DEFINE_int32(train_intermediate_table_id, 3, "Intermediate table for train data.");
-DEFINE_int32(test_intermediate_table_id, 4, "Intermediate table for test data.");
+DEFINE_int32(train_vote_table_id, 2, "Vote table for train data.");
+DEFINE_int32(gain_ratio_table_id, 3, "Gain ratio table.");
+DEFINE_int32(train_intermediate_table_id, 4, "Intermediate table for train data.");
+DEFINE_int32(test_intermediate_table_id, 5, "Intermediate table for test data.");
 
 DEFINE_int32(row_oplog_type, petuum::RowOpLogType::kSparseRowOpLog,
     "row oplog type");
@@ -145,6 +146,19 @@ int main(int argc, char *argv[]) {
   table_config.oplog_capacity = table_config.process_cache_capacity;
   petuum::PSTableGroup::CreateTable(FLAGS_test_vote_table_id, table_config);
 
+  // Create vote_table to collect tests.
+  petuum::ClientTableConfig train_table_config;
+  train_table_config.table_info.row_type = kDenseRowIntTypeID;
+  train_table_config.table_info.table_staleness = 0;
+  train_table_config.table_info.row_capacity = num_labels;
+  train_table_config.table_info.row_oplog_type = FLAGS_row_oplog_type;
+  train_table_config.table_info.oplog_dense_serialized =
+    FLAGS_oplog_dense_serialized;
+  // each test data is a row.
+  train_table_config.process_cache_capacity = num_train_data;
+  train_table_config.oplog_capacity = train_table_config.process_cache_capacity;
+  petuum::PSTableGroup::CreateTable(FLAGS_train_vote_table_id, train_table_config);
+
   // Create gain_ratio_table to collect gain ratio
   petuum::ClientTableConfig gain_ratio_table_config;
   gain_ratio_table_config.table_info.row_type = kDenseRowFloatTypeID;
@@ -166,7 +180,7 @@ int main(int argc, char *argv[]) {
   train_intermediate_table_config.table_info.oplog_dense_serialized = 
 	  FLAGS_oplog_dense_serialized;
   // each train data is a row.
-  train_intermediate_table_config.process_cache_capacity = num_train_data;
+  train_intermediate_table_config.process_cache_capacity = num_train_data*FLAGS_num_layers;
   train_intermediate_table_config.oplog_capacity = train_intermediate_table_config.process_cache_capacity;
   petuum::PSTableGroup::CreateTable(FLAGS_train_intermediate_table_id, train_intermediate_table_config);
 
@@ -179,7 +193,7 @@ int main(int argc, char *argv[]) {
   test_intermediate_table_config.table_info.oplog_dense_serialized = 
 	  FLAGS_oplog_dense_serialized;
   // each test data is a row.
-  test_intermediate_table_config.process_cache_capacity = num_test_data;
+  test_intermediate_table_config.process_cache_capacity = num_test_data*FLAGS_num_layers;
   test_intermediate_table_config.oplog_capacity = test_intermediate_table_config.process_cache_capacity;
   petuum::PSTableGroup::CreateTable(FLAGS_test_intermediate_table_id, test_intermediate_table_config);
 

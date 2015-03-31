@@ -55,6 +55,7 @@ private:  // private methods
   // Register label votes on test data on test_vote_table_.
   //float VoteOnTestData(const RandForest& rand_forest);
   void VoteOnTestData(const RandForest& rand_forest);
+  void VoteOnTrainData(const RandForest& rand_forest);
 
   // Register label votes on train data on train_vote_table_.
   void GoDownTrainData(const RandForest& rand_forest, int tree_idx_start, int c_layer);
@@ -116,6 +117,7 @@ private:
 
   // ============ PS Tables ============
   petuum::Table<int> test_vote_table_;
+  petuum::Table<int> train_vote_table_;
   petuum::Table<float> gain_ratio_table_;
   petuum::Table<int> train_intermediate_table_;
   petuum::Table<int> test_intermediate_table_;

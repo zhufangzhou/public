@@ -22,6 +22,7 @@ DECLARE_bool(compute_importance);
 
 // Rand Forest Parameters
 DECLARE_int32(test_vote_table_id);
+DECLARE_int32(train_vote_table_id);
 DECLARE_int32(gain_ratio_table_id);
 DECLARE_int32(train_intermediate_table_id);
 DECLARE_int32(test_intermediate_table_id);

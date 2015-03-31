@@ -190,6 +190,8 @@ void RandForestEngine::Start(int c_layer, int thread_id) {
   if (thread_id == 0) {
     test_vote_table_ =
       petuum::PSTableGroup::GetTableOrDie<int>(FLAGS_test_vote_table_id);
+    train_vote_table_ =
+      petuum::PSTableGroup::GetTableOrDie<int>(FLAGS_train_vote_table_id);
 	gain_ratio_table_ = 
 	  petuum::PSTableGroup::GetTableOrDie<float>(FLAGS_gain_ratio_table_id);
 	train_intermediate_table_ =
@@ -280,6 +282,9 @@ void RandForestEngine::Start(int c_layer, int thread_id) {
 		//float test_error = VoteOnTestData(rand_forest);
 		VoteOnTestData(rand_forest);
 		petuum::PSTableGroup::GlobalBarrier();
+		// TEMPORARY!!!!! 
+		VoteOnTrainData(rand_forest);
+		petuum::PSTableGroup::GlobalBarrier();
 		if (FLAGS_client_id == 0 && thread_id == 0) {
 			GeneratePerformanceReport();
 		}
@@ -296,6 +301,7 @@ void RandForestEngine::Start(int c_layer, int thread_id) {
 			//<< " computed on " << test_features_.size() << " test instances.";
 		//}
 	  }
+
   }
 
   if (c_layer == 0) {
@@ -334,6 +340,19 @@ void RandForestEngine::VoteOnTestData(const RandForest& rand_forest) {
     test_vote_table_.BatchInc(i, vote_update_batch);
   }
   //return error / test_features_.size();
+}
+
+void RandForestEngine::VoteOnTrainData(const RandForest& rand_forest) {
+  for (int i = 0; i < train_features_.size(); ++i) {
+    std::vector<int> votes;
+    const petuum::ml::AbstractFeature<float>& x = *(train_features_[i]);
+    rand_forest.Predict(x, &votes);
+    petuum::UpdateBatch<int> vote_update_batch(num_labels_);
+    for (int j = 0; j < num_labels_; ++j) {
+      vote_update_batch.UpdateSet(j, j, votes[j]);
+    }
+    train_vote_table_.BatchInc(i, vote_update_batch);
+  }
 }
 
 void RandForestEngine::GoDownTrainData(const RandForest& rand_forest, int tree_idx_start, int c_layer) {
@@ -419,7 +438,8 @@ float RandForestEngine::ComputeTestError() {
 }
 
 void RandForestEngine::GeneratePerformanceReport() {
-	std::vector<std::vector<float> > proba_dist;
+	std::vector<std::vector<float> > train_proba_dist;
+	std::vector<std::vector<float> > test_proba_dist;
 
 	// Save perdict result to file
 	std::ofstream fpred;
@@ -428,7 +448,24 @@ void RandForestEngine::GeneratePerformanceReport() {
 		CHECK(fpred != NULL) << "Cannot open prediction output file ";
 	}
 
-	proba_dist.resize(test_features_.size());
+	// train performance
+	train_proba_dist.resize(train_features_.size());
+	for (int i = 0; i < train_features_.size(); i++) {
+		petuum::RowAccessor row_acc;
+		train_vote_table_.Get(i, &row_acc);
+		const auto& train_vote_row = row_acc.Get<petuum::DenseRow<int> >();
+		std::vector<int> train_votes;
+		std::vector<float> single_proba_dist;
+		train_vote_row.CopyToVector(&train_votes);
+		Int2Float(train_votes, single_proba_dist);
+		Normalize(&single_proba_dist);
+
+
+		// add to the overall probability distribution
+		train_proba_dist[i] = single_proba_dist;
+	}
+
+	test_proba_dist.resize(test_features_.size());
 	for (int i = 0; i < test_features_.size(); i++) {
 		petuum::RowAccessor row_acc;
 		test_vote_table_.Get(i, &row_acc);
@@ -441,7 +478,7 @@ void RandForestEngine::GeneratePerformanceReport() {
 
 
 		// add to the overall probability distribution
-		proba_dist[i] = single_proba_dist;
+		test_proba_dist[i] = single_proba_dist;
 		if (save_pred_) {
 			if (output_proba_) {
 				fpred << std::fixed << std::setprecision(3);
@@ -459,8 +496,10 @@ void RandForestEngine::GeneratePerformanceReport() {
 		}
 	}
 
+
 	if (save_report_)
-		PerformanceReport(report_file_, proba_dist, test_labels_, num_labels_);
+		//PerformanceReport(report_file_, proba_dist, test_labels_, num_labels_);
+		PerformanceReport(report_file_, train_proba_dist, train_labels_, test_proba_dist, test_labels_, num_labels_);
 
 	if (fpred.is_open()) {
 		fpred.close();
